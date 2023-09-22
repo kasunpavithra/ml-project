@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[15]:
+# In[62]:
 
 
 from sklearn.base import BaseEstimator, ClassifierMixin
@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
 class MyModel(BaseEstimator, ClassifierMixin):
-    def __init__(self, C=1.0, kernel='linear', gamma='scale', n_components=0.97, variance_t=0.001, corr_t= 0.9, random_state=None):
+    def __init__(self, C=5.74, kernel='rbf', gamma='auto', n_components=0.99, variance_t=0.001, corr_t= 0.9, random_state=None):
         """
         Initialize the MyModel with hyperparameters.
 
@@ -61,12 +61,13 @@ class MyModel(BaseEstimator, ClassifierMixin):
         scvx_train = pd.DataFrame(self.sscaler.fit_transform(cvx_train), columns=cvx_train.columns)
         
         # define the pca
-        self.pcac = PCA(n_components= self.n_components, svd_solver="full")
+        self.pcac = PCA(n_components= self.n_components)
 
         pscvx_train = self.pcac.fit_transform(scvx_train)
+        print(f"No of new Lables: {len(pscvx_train[0])}")
         
         
-        self.model = SVC(C=self.C, kernel=self.kernel, gamma=self.gamma, random_state=self.random_state)
+        self.model = SVC(C=self.C, kernel=self.kernel, gamma=self.gamma, random_state=self.random_state, class_weight="balanced")
         self.model.fit(pscvx_train, y_train)
 
     def predict(self, X):
@@ -114,14 +115,14 @@ class MyModel(BaseEstimator, ClassifierMixin):
         return self.x_valid
 
 
-# In[16]:
+# In[63]:
 
 
 # Importing necessary libraries
 import pandas as pd
 
 
-# In[17]:
+# In[64]:
 
 
 train = pd.read_csv("./train.csv")
@@ -133,14 +134,14 @@ train.drop(dropping_labels, axis=1, inplace= True)
 valid.drop(dropping_labels, axis=1, inplace= True)
 
 
-# In[18]:
+# In[65]:
 
 
 # check whether any missing values in the train set
 train.columns[train.isnull().any()]
 
 
-# In[19]:
+# In[66]:
 
 
 # splitting features and the label
@@ -171,7 +172,7 @@ param_dist = {
     'C': uniform(0.1, 100.0),
     'kernel': ['linear', 'rbf', 'poly'],
     'gamma': ['scale', 'auto'],
-    'n_components': [0.97, 0.98, 0.99],
+    'n_components': uniform(0.960,0.999),
     'variance_t': [0.001],
     'corr_t': [None]
 }
@@ -179,7 +180,7 @@ param_dist = {
 random_search = RandomizedSearchCV(
     estimator=my_model,
     param_distributions=param_dist,
-    n_iter=10,  # Number of random combinations to try
+    n_iter=50,  # Number of random combinations to try
     cv=5,  # Number of cross-validation folds
     verbose=2,
     random_state=42,  # Set a random seed for reproducibility
@@ -189,6 +190,12 @@ random_search.fit(x_train, y_train)
 
 print("Best hyperparameters found by RandomizedSearchCV:")
 print(random_search.best_params_)
+
+
+# In[ ]:
+
+
+
 
 
 # In[ ]:
