@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[62]:
+# In[85]:
 
 
 from sklearn.base import BaseEstimator, ClassifierMixin
@@ -10,6 +10,7 @@ from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import uniform
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from imblearn.over_sampling import SMOTE
 
 class MyModel(BaseEstimator, ClassifierMixin):
     def __init__(self, C=5.74, kernel='rbf', gamma='auto', n_components=0.99, variance_t=0.001, corr_t= 0.9, random_state=None):
@@ -43,10 +44,16 @@ class MyModel(BaseEstimator, ClassifierMixin):
         - y: Target labels
         """
         
-        #using variance threshold
-        self.drop = self.variance_treshould_invf(x_train)
+        # Instantiate SMOTE with desired sampling strategy
+        smote = SMOTE(sampling_strategy='auto', random_state=42)  # You can adjust the sampling strategy
+
+        # Fit and transform the dataset
+        x_resampled, y_resampled = smote.fit_resample(x_train, y_train)
         
-        vx_train = x_train.drop(columns=self.drop,axis=1)
+        #using variance threshold
+        self.drop = self.variance_treshould_invf(x_resampled)
+        
+        vx_train = x_resampled.drop(columns=self.drop,axis=1)
         
         # using correlation
 #         next_drop = self.correlation(vx_train)
@@ -68,7 +75,7 @@ class MyModel(BaseEstimator, ClassifierMixin):
         
         
         self.model = SVC(C=self.C, kernel=self.kernel, gamma=self.gamma, random_state=self.random_state, class_weight="balanced")
-        self.model.fit(pscvx_train, y_train)
+        self.model.fit(pscvx_train, y_resampled)
 
     def predict(self, X):
         """
@@ -115,81 +122,95 @@ class MyModel(BaseEstimator, ClassifierMixin):
         return self.x_valid
 
 
-# In[63]:
+# In[86]:
+
+
+def append_to_file(text):
+    with open("outputs.txt", "a") as file:
+        # Write content to the file
+        file.write(f"{text}\n")
+
+
+# In[87]:
 
 
 # Importing necessary libraries
 import pandas as pd
+from sklearn.model_selection import cross_val_score
 
+all_labels = ["label_1","label_2","label_3", "label_4"]
+for label in all_labels:
+    droping_labels = all_labels.copy()
+    droping_labels.remove(label)
+    
+    train = pd.read_csv("./train.csv")
+    valid = pd.read_csv("./valid.csv")
 
-# In[64]:
+    train.drop(droping_labels, axis=1, inplace=True)
+    valid.drop(droping_labels, axis=1, inplace=True)
+    
+    if(len(train.columns[train.isnull().any()])>0):
+        print(f"{label} has missing values in train set")
+        train.dropna(inplace=True)
+        
+    if(len(valid.columns[train.isnull().any()])>0):
+        print(f"{label} has missing values in valid set")
+        valid.dropna(inplace=True)
+    
+    # splitting features and the label
+    x_train = train.drop([label], axis=1)
+    y_train = train[label]
+    x_valid = valid.drop([label], axis=1)
+    y_valid = valid[label]
+    
+    
+    # Create an instance of MyModel
+    my_model = MyModel()
 
+    # Fit the model to the training data
+    my_model.fit(x_train, y_train)
 
-train = pd.read_csv("./train.csv")
-valid = pd.read_csv("./valid.csv")
+    # Make predictions on the test data
+    y_pred = my_model.predict(x_valid)
 
-# drop label_2, label_3 and label_4
-dropping_labels = ["label_2","label_3", "label_4"]
-train.drop(dropping_labels, axis=1, inplace= True)
-valid.drop(dropping_labels, axis=1, inplace= True)
+    # Print the accuracy of the model
+    accuracy = (y_pred == y_valid).mean()
+    print(f"Accuracy for {label}: {accuracy}")
+    append_to_file(f"Initial accuracy for {label}: {accuracy}")
 
+    # Example of using RandomizedSearchCV to tune hyperparameters
+    param_dist = {
+        'C': uniform(0.1, 100.0),
+        'kernel': ['linear', 'rbf', 'poly'],
+        'gamma': ['scale', 'auto'],
+        'n_components': [0.98, 0.99,0.999],
+        'variance_t': [0.001],
+        'corr_t': [None]
+    }
 
-# In[65]:
+    random_search = RandomizedSearchCV(
+        estimator=my_model,
+        param_distributions=param_dist,
+        n_iter=2,  # Number of random combinations to try
+        cv=5,  # Number of cross-validation folds
+        verbose=2,
+        random_state=42,  # Set a random seed for reproducibility
+        n_jobs=-1  # Use all available CPU cores for parallel computation
+    )
+    random_search.fit(x_train, y_train)
 
+    print("Best hyperparameters found by RandomizedSearchCV:")
+    print(random_search.best_params_)
+    append_to_file(f"Best params for {label} : {random_search.best_params_}")
+    
+    # Perform cross-validation to evaluate the model with the best hyperparameters
+    cross_val_scores = cross_val_score(random_search, X, y, cv=5, n_jobs=-1)
 
-# check whether any missing values in the train set
-train.columns[train.isnull().any()]
-
-
-# In[66]:
-
-
-# splitting features and the label
-x_train = train.drop(["label_1"], axis=1)
-y_train = train["label_1"]
-x_valid = valid.drop(["label_1"], axis=1)
-y_valid = valid["label_1"]
-
-
-# In[ ]:
-
-
-# Create an instance of MyModel
-my_model = MyModel()
-
-# Fit the model to the training data
-my_model.fit(x_train, y_train)
-
-# Make predictions on the test data
-y_pred = my_model.predict(x_valid)
-
-# Print the accuracy of the model
-accuracy = (y_pred == y_valid).mean()
-print(f"Accuracy: {accuracy}")
-
-# Example of using RandomizedSearchCV to tune hyperparameters
-param_dist = {
-    'C': uniform(0.1, 100.0),
-    'kernel': ['linear', 'rbf', 'poly'],
-    'gamma': ['scale', 'auto'],
-    'n_components': uniform(0.960,0.999),
-    'variance_t': [0.001],
-    'corr_t': [None]
-}
-
-random_search = RandomizedSearchCV(
-    estimator=my_model,
-    param_distributions=param_dist,
-    n_iter=50,  # Number of random combinations to try
-    cv=5,  # Number of cross-validation folds
-    verbose=2,
-    random_state=42,  # Set a random seed for reproducibility
-    n_jobs=-1  # Use all available CPU cores for parallel computation
-)
-random_search.fit(x_train, y_train)
-
-print("Best hyperparameters found by RandomizedSearchCV:")
-print(random_search.best_params_)
+    # Print cross-validation scores
+    print("Cross-Validation Scores:", cross_val_scores)
+    append_to_file(f"Cross-Validation Scores for {label} : {cross_val_scores} \n")
+    print("Mean CV Score:", np.mean(cross_val_scores))
+    append_to_file(f"Mean CV Score for {label} : {np.mean(cross_val_scores)}")
 
 
 # In[ ]:
