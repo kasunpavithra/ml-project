@@ -13,7 +13,7 @@ from sklearn.decomposition import PCA
 from imblearn.over_sampling import SMOTE
 
 class MyModel(BaseEstimator, ClassifierMixin):
-    def __init__(self, C=83.4, kernel='rbf', gamma='scale', n_components=None, variance_t=0.001, corr_t= 0.9, random_state=None):
+    def __init__(self, C=83.4, kernel='rbf', gamma='scale', n_components=None, variance_t=0.001, corr_t= 0.9,resample=False, random_state=None):
         """
         Initialize the MyModel with hyperparameters.
 
@@ -34,6 +34,7 @@ class MyModel(BaseEstimator, ClassifierMixin):
         self.drop = None
         self.sscaler = None,
         self.pcac = None
+        self.resample = resample
 
     def fit(self, x_train, y_train):
         """
@@ -44,12 +45,15 @@ class MyModel(BaseEstimator, ClassifierMixin):
         - y: Target labels
         """
         
-        # Instantiate SMOTE with desired sampling strategy
-        smote = SMOTE(sampling_strategy='auto', random_state=42)  # You can adjust the sampling strategy
+        if(self.resample):
+            # Instantiate SMOTE with desired sampling strategy
+            smote = SMOTE(sampling_strategy='auto', random_state=42)  # You can adjust the sampling strategy
 
-        # Fit and transform the dataset
-        x_resampled, y_resampled = smote.fit_resample(x_train, y_train)
-        
+            # Fit and transform the dataset
+            x_resampled, y_resampled = smote.fit_resample(x_train, y_train)
+        else:
+            x_resampled, y_resampled = x_train, y_train
+            
         #using variance threshold
         self.drop = self.variance_treshould_invf(x_resampled)
         
@@ -142,6 +146,7 @@ def append_to_file(text):
 # Importing necessary libraries
 import pandas as pd
 from sklearn.model_selection import cross_val_score
+import numpy as np
 
 all_labels = ["label_1","label_2","label_3", "label_4"]
 for label in all_labels:
@@ -190,7 +195,8 @@ for label in all_labels:
         'gamma': ['scale', 'auto']+[int(x)/1000 for x in np.linspace(100, 10000, 20)],
         'n_components': [None, 0.97, 0.98, 0.99, 0.999],
         'variance_t': [0.001],
-        'corr_t': [None]
+        'corr_t': [None],
+        'resample': [True, False]
     }
 
     random_search = RandomizedSearchCV(
