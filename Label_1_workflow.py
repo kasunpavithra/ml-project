@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[85]:
+# In[1]:
 
 
 from sklearn.base import BaseEstimator, ClassifierMixin
@@ -13,7 +13,7 @@ from sklearn.decomposition import PCA
 from imblearn.over_sampling import SMOTE
 
 class MyModel(BaseEstimator, ClassifierMixin):
-    def __init__(self, C=5.74, kernel='rbf', gamma='auto', n_components=0.99, variance_t=0.001, corr_t= 0.9, random_state=None):
+    def __init__(self, C=83.4, kernel='rbf', gamma='scale', n_components=None, variance_t=0.001, corr_t= 0.9, random_state=None):
         """
         Initialize the MyModel with hyperparameters.
 
@@ -68,10 +68,13 @@ class MyModel(BaseEstimator, ClassifierMixin):
         scvx_train = pd.DataFrame(self.sscaler.fit_transform(cvx_train), columns=cvx_train.columns)
         
         # define the pca
-        self.pcac = PCA(n_components= self.n_components)
+        if(self.n_components):
+            self.pcac = PCA(n_components= self.n_components)
 
-        pscvx_train = self.pcac.fit_transform(scvx_train)
-        print(f"No of new Lables: {len(pscvx_train[0])}")
+            pscvx_train = self.pcac.fit_transform(scvx_train)
+            print(f"No of new Lables: {len(pscvx_train[0])}")
+        else:
+            pscvx_train = scvx_train
         
         
         self.model = SVC(C=self.C, kernel=self.kernel, gamma=self.gamma, random_state=self.random_state, class_weight="balanced")
@@ -95,8 +98,10 @@ class MyModel(BaseEstimator, ClassifierMixin):
         
         scvx_valid = pd.DataFrame(self.sscaler.transform(cvx_valid), columns=cvx_valid.columns)
         
-        pscvx_valid = self.pcac.transform(scvx_valid)
-        
+        if self.n_components:
+            pscvx_valid = self.pcac.transform(scvx_valid)
+        else:
+            pscvx_valid = scvx_valid
         return self.model.predict(pscvx_valid)
     
     def variance_treshould_invf(self, X):
@@ -122,16 +127,16 @@ class MyModel(BaseEstimator, ClassifierMixin):
         return self.x_valid
 
 
-# In[86]:
+# In[2]:
 
 
 def append_to_file(text):
-    with open("outputs.txt", "a") as file:
+    with open("outputs2.txt", "a") as file:
         # Write content to the file
         file.write(f"{text}\n")
 
 
-# In[87]:
+# In[ ]:
 
 
 # Importing necessary libraries
@@ -182,8 +187,8 @@ for label in all_labels:
     param_dist = {
         'C': uniform(0.1, 100.0),
         'kernel': ['linear', 'rbf', 'poly'],
-        'gamma': ['scale', 'auto'],
-        'n_components': [0.98, 0.99,0.999],
+        'gamma': ['scale', 'auto']+[int(x)/1000 for x in np.linspace(100, 10000, 20)],
+        'n_components': [None, 0.97, 0.98, 0.99, 0.999],
         'variance_t': [0.001],
         'corr_t': [None]
     }
@@ -191,7 +196,7 @@ for label in all_labels:
     random_search = RandomizedSearchCV(
         estimator=my_model,
         param_distributions=param_dist,
-        n_iter=2,  # Number of random combinations to try
+        n_iter=20,  # Number of random combinations to try
         cv=5,  # Number of cross-validation folds
         verbose=2,
         random_state=42,  # Set a random seed for reproducibility
@@ -203,14 +208,17 @@ for label in all_labels:
     print(random_search.best_params_)
     append_to_file(f"Best params for {label} : {random_search.best_params_}")
     
+    print("Best Score:", random_search.best_score_)
+    append_to_file(f"Best score for {label} : {random_search.best_score_}")
+    
     # Perform cross-validation to evaluate the model with the best hyperparameters
-    cross_val_scores = cross_val_score(random_search, X, y, cv=5, n_jobs=-1)
+#     cross_val_scores = cross_val_score(random_search, X, y, cv=5, n_jobs=-1)
 
     # Print cross-validation scores
-    print("Cross-Validation Scores:", cross_val_scores)
-    append_to_file(f"Cross-Validation Scores for {label} : {cross_val_scores} \n")
-    print("Mean CV Score:", np.mean(cross_val_scores))
-    append_to_file(f"Mean CV Score for {label} : {np.mean(cross_val_scores)}")
+#     print("Cross-Validation Scores:", cross_val_scores)
+#     append_to_file(f"Cross-Validation Scores for {label} : {cross_val_scores} \n")
+#     print("Mean CV Score:", np.mean(cross_val_scores))
+#     append_to_file(f"Mean CV Score for {label} : {np.mean(cross_val_scores)}")
 
 
 # In[ ]:
