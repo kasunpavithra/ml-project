@@ -191,12 +191,12 @@ for label in all_labels:
     # Example of using RandomizedSearchCV to tune hyperparameters
     param_dist = {
         'C': uniform(0.1, 100.0),
-        'kernel': ['linear', 'rbf', 'poly'],
-        'gamma': ['scale', 'auto']+[int(x)/1000 for x in np.linspace(100, 10000, 20)],
-        'n_components': [None, 0.97, 0.98, 0.99, 0.999],
+        'kernel': ['linear', 'rbf'],
+        'gamma': uniform(0.01, 0.1),
+        'n_components': [0.99, 0.95],
         'variance_t': [0.001],
         'corr_t': [None],
-        'resample': [True, False]
+        'resample': [False]
     }
 
     random_search = RandomizedSearchCV(
